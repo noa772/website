@@ -359,7 +359,7 @@
             <table class="w-full border-collapse table-fixed min-w-[760px]">
               <thead>
                 <tr class="bg-slate-50 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300">
-                  <th class="w-20 py-3 px-2 text-center border-l border-slate-200 dark:border-slate-700">שעה</th>
+                  <th class="w-28 py-3 px-2 text-center border-l border-slate-200 dark:border-slate-700">שעה</th>
                   <th class="py-3 px-1 text-center border-l border-slate-200 dark:border-slate-700">ראשון</th>
                   <th class="py-3 px-1 text-center border-l border-slate-200 dark:border-slate-700">שני</th>
                   <th class="py-3 px-1 text-center border-l border-slate-200 dark:border-slate-700">שלישי</th>
@@ -1368,9 +1368,9 @@
       let rowsHtml = '';
 
       for (let hour = START_HOUR; hour < END_HOUR; hour++) {
-        const timeLabel = `${String(hour).padStart(2, '0')}:00`;
+        const timeLabel = `${String(hour).padStart(2, '0')}:00 - ${String(hour + 1).padStart(2, '0')}:00`;
         rowsHtml += `<tr class="border-b border-slate-100 dark:border-slate-700/70">`;
-        rowsHtml += `<td class="py-2 px-1.5 text-center text-[11px] font-bold text-slate-500 dark:text-slate-400 bg-slate-50/70 dark:bg-slate-900/40 border-l border-slate-200 dark:border-slate-700">${timeLabel}</td>`;
+        rowsHtml += `<td class="py-2 px-1.5 text-center text-[11px] font-bold text-slate-500 dark:text-slate-400 bg-slate-50/70 dark:bg-slate-900/40 border-l border-slate-200 dark:border-slate-700 whitespace-nowrap">${timeLabel}</td>`;
 
         for (let day = 0; day < 7; day++) {
           rowsHtml += renderSlotCellHtml(day, hour);
