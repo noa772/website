@@ -295,7 +295,7 @@
           </div>
           <div>
             <h2 class="text-sm sm:text-base font-bold">מערכת שעות שבועית (08:00 - 22:00)</h2>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">גררי משימה מהרשימה או לחצי על משימה ואז על השעה הרצויה לשיבוץ.</p>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">גררי משימה לשיבוץ, או לחצי ישירות על תא ריק לחסימת זמן אישי (אימון, חברים...).</p>
           </div>
         </div>
 
@@ -553,7 +553,7 @@
     let subjects = [...DEFAULT_SUBJECTS];
     let categories = [...DEFAULT_CATEGORIES];
     let tasks = [];
-    let scheduleSlots = {}; // key: "day-hour" -> { type: 'fixed'|'task', title?, subject?, taskId? }
+    let scheduleSlots = {}; // key: "day-hour" -> { type: 'fixed'|'task'|'blocked', title?, subject?, taskId? }
 
     let activeTab = 'tasks';
     let selectedMobileDay = new Date().getDay(); // Default to today's day (0=Sunday..6=Saturday)
@@ -1218,7 +1218,7 @@
         showToast('אין משימות משובצות לניקוי');
         return;
       }
-      if (!window.confirm('לנקות את כל המשימות מהמערכת? (המשבצות הקבועות יישארו נעולות)')) return;
+      if (!window.confirm('לנקות את כל המשימות מהמערכת? (המשבצות הקבועות והזמנים האישיים יישארו)')) return;
 
       Object.keys(scheduleSlots).forEach(key => {
         if (scheduleSlots[key]?.type === 'task') delete scheduleSlots[key];
@@ -1238,14 +1238,20 @@
       const key = `${day}-${hour}`;
       const existing = scheduleSlots[key];
 
-      if (existing?.type === 'fixed') {
-        showToast('זוהי משבצת קבועה ונעולה — לא ניתן לשבץ בה משימה', true);
+      if (existing?.type === 'fixed' || existing?.type === 'blocked') {
+        showToast('המשבצת תפוסה — לחצי על ה-X כדי לפנות אותה', true);
         return;
       }
 
+      // אם לא נבחרה משימה מהרשימה -> חסימת זמן אישי מהירה
       if (!selectedTaskIdForScheduling) {
-        if (!existing) {
-          showToast('בחרי קודם משימה מהרשימה שליד המערכת כדי לשבץ אותה');
+        if (existing) return;
+        const label = window.prompt('מה לחסום בלוז? (למשל: אימון, מפגש עם חברים)');
+        if (label && label.trim()) {
+          scheduleSlots[key] = { type: 'blocked', title: label.trim() };
+          renderScheduleView();
+          saveToCloud();
+          showToast('הזמן נחסם בלוז');
         }
         return;
       }
@@ -1273,7 +1279,7 @@
 
     window.handleSlotDragOver = function(event, day, hour) {
       const slot = scheduleSlots[`${day}-${hour}`];
-      if (slot?.type === 'fixed') return;
+      if (slot?.type === 'fixed' || slot?.type === 'blocked') return;
       event.preventDefault();
       event.currentTarget.classList.add('drag-over');
     };
@@ -1286,8 +1292,8 @@
       event.preventDefault();
       event.currentTarget.classList.remove('drag-over');
       const key = `${day}-${hour}`;
-      if (scheduleSlots[key]?.type === 'fixed') {
-        showToast('לא ניתן לשבץ על משבצת קבועה', true);
+      if (scheduleSlots[key]?.type === 'fixed' || scheduleSlots[key]?.type === 'blocked') {
+        showToast('לא ניתן לשבץ על משבצת תפוסה', true);
         return;
       }
 
@@ -1417,6 +1423,22 @@
         `;
       }
 
+      if (slot.type === 'blocked') {
+        return `
+          <td onclick="handleSlotClick(${day}, ${hour})" class="h-14 p-1 align-top select-none ${borderClass}">
+            <div class="h-full w-full rounded-lg p-1.5 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100 flex flex-col justify-between relative group overflow-hidden border border-slate-300 dark:border-slate-600">
+              <div class="flex items-start justify-between gap-1">
+                <span class="text-[11px] font-bold leading-tight line-clamp-2">${escapeHtml(slot.title)}</span>
+                <button onclick="removeScheduleSlot(${day}, ${hour}, event)" title="פנה שעה" class="text-slate-500 hover:text-rose-500 transition-colors shrink-0">
+                  <i class="fa-solid fa-xmark text-[11px]"></i>
+                </button>
+              </div>
+              <span class="text-[9px] text-slate-500 dark:text-slate-400">זמן אישי</span>
+            </div>
+          </td>
+        `;
+      }
+
       const task = tasks.find(t => t.id === slot.taskId);
       if (!task) return `<td class="h-14 p-1 ${borderClass}"></td>`;
       const color = getSubjectColor(task.subject);
@@ -1476,7 +1498,7 @@
             <div onclick="handleSlotClick(${selectedMobileDay}, ${hour})" class="p-3 flex items-center gap-3 active:bg-indigo-50 dark:active:bg-indigo-950/40 cursor-pointer">
               <span class="w-24 text-xs font-bold text-slate-400 shrink-0">${timeStr}</span>
               <div class="flex-1 h-10 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center text-[11px] text-slate-400">
-                ${selectedTaskIdForScheduling ? '+ לחצי לשיבוץ כאן' : 'פנוי'}
+                ${selectedTaskIdForScheduling ? '+ לחצי לשיבוץ כאן' : 'פנוי (לחצי לחסימת זמן)'}
               </div>
             </div>
           `;
@@ -1495,6 +1517,21 @@
                 </div>
                 <button onclick="removeScheduleSlot(${selectedMobileDay}, ${hour}, event)" class="p-1.5 text-white/80 hover:text-white">
                   <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+              </div>
+            </div>
+          `;
+        } else if (slot.type === 'blocked') {
+          html += `
+            <div class="p-3 flex items-center gap-3">
+              <span class="w-24 text-xs font-bold text-slate-500 dark:text-slate-400 shrink-0">${timeStr}</span>
+              <div class="flex-1 rounded-xl p-2.5 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100 flex items-center justify-between gap-2 border border-slate-300 dark:border-slate-600">
+                <div class="min-w-0">
+                  <div class="text-xs font-bold truncate">${escapeHtml(slot.title)}</div>
+                  <div class="text-[10px] text-slate-500 dark:text-slate-400">זמן אישי</div>
+                </div>
+                <button onclick="removeScheduleSlot(${selectedMobileDay}, ${hour}, event)" class="p-1.5 text-slate-500 hover:text-rose-500">
+                  <i class="fa-solid fa-xmark text-xs"></i>
                 </button>
               </div>
             </div>
